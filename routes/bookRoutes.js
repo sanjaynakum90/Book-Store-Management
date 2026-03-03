@@ -1,30 +1,28 @@
 import express from "express";
-import {
-    getAllBooks,
-    getBookById,
-    createBook,
-    updateBook,
-    deleteBook,
-    searchBooks,
-} from "../controllers/bookController.js";
+import bookController from "../controller/bookController.js"
+import upload from "../middleware/upload.js"
 
 const router = express.Router();
 
-router.get("/search", searchBooks);
+const uploadFields = upload.fields([
+  { name: "coverImage", maxCount: 1 },
+  { name: "galleryImages", maxCount: 10 },
+]);
 
-// GET /books — get all books
-router.get("/", getAllBooks);
+router.get("/", bookController.getAllBooks);
 
-// GET /books/:id 
-router.get("/:id", getBookById);
+router.get("/add", bookController.getAddBook);
 
-// POST /books 
-router.post("/", createBook);
+router.post("/add", uploadFields, bookController.addBook);
 
-// PUT /books/:id 
-router.put("/:id", updateBook);
+router.get("/edit/:id", bookController.getEditBook);
 
-// DELETE /books/:id 
-router.delete("/:id", deleteBook);
+router.post(
+  "/edit/:id",
+  uploadFields,
+  bookController.updateBook
+);
+
+router.post("/delete/:id", bookController.deleteBook);
 
 export default router;

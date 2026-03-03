@@ -1,45 +1,59 @@
 import express from "express";
-import HttpError from "./middleware/HttpError.js";
-import bookRouter from "./routes/bookRoutes.js";
-import connectDB from "./db/db.js";
+import dotenv from "dotenv";
+
+import HttpError from "./middleware/httpError.js"
+import bookRoutes from "./routes/bookRoutes.js"
+import connectDb from "./config/db.js"
+
+dotenv.config();
 
 const app = express();
-app.use(express.json());
 
-app.use("/books", bookRouter);
-
-app.get("/", (req, res) => {
-    res.status(200).json({ message: "Welcome to the Bookstore Management API" });
-});
+const port = process.env.PORT || 3000;
 
 
+app.use("/books", bookRoutes);
+
+
+app.get("/", (req, res) => res.redirect("/books"));
+
+
+// undefined routes
 
 app.use((req, res, next) => {
-    next(new HttpError("Route Not Found", 404));
+
+  next(new HttpError("Route not found", 404));
+
 });
 
-// Global error handler
+// centralized error handling
+
 app.use((error, req, res, next) => {
-    if (res.headersSent) {
-        return next(error);
-    }
-    res
-        .status(error.statusCode || 500)
-        .json({ message: error.message || "Server Error" });
+
+  res.status(error.statusCode || 500).json({
+    message: error.message || "Internal Server Error",
+  });
+  
 });
 
-const port = process.env.PORT || 5000;
 
-async function serverStart() {
-    try {
-        await connectDB();
-        app.listen(port, () => {
-            console.log(`Server is running on port ${port}`);
-        });
-    } catch (error) {
-        console.log(error.message);
-        process.exit(1);
+const startServer = async () => {
+  try {
+    const connect = await connectDb();
+
+    if (!connect) {
+      throw new Error("Failed to connect to the database");
     }
-}
 
-serverStart();
+    console.log("✅ Database connected");
+
+    app.listen(port, () => {
+      console.log(`🚀 Server running at http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error("❌ Error:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();

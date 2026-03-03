@@ -1,146 +1,170 @@
-import Book from "../models/bookModel.js";
-import HttpError from "../middleware/HttpError.js";
-import mongoose from "mongoose";
+import fs from "fs";
 
-// Helper: validate MongoDB ObjectId
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
+import Book from "../model/bookModel.js"
+import HttpError from "../middleware/httpError.js";
 
-// GET /books — get all books (with optional pagination)
-export const getAllBooks = async (req, res, next) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
 
-        const totalBooks = await Book.countDocuments();
-        const books = await Book.find().skip(skip).limit(limit).sort({ createdAt: -1 });
+// Get All Books
 
-        res.status(200).json({
-            message: "Books retrieved successfully",
-            total: totalBooks,
-            page,
-            totalPages: Math.ceil(totalBooks / limit),
-            books,
+const getAllBooks = async (req, res, next) => {
+  try {
+    const books = await Book.find().sort({ createdAt: -1 });
+
+    res.render("books", { books });
+
+  } catch (error) {
+    next(new HttpError(error.message, 500));
+  }
+};
+
+
+// Show Add Book Form
+
+const getAddBook = (req, res) => {
+  res.render("addBook");
+};
+
+
+// Add Book
+
+const addBook = async (req, res, next) => {
+  try {
+    const { title, author, description, price } = req.body;
+
+    const coverImage = req.files?.coverImage?.[0]?.path;
+
+    const galleryImages =
+      req.files?.galleryImages?.map((file) => file.path) || [];
+
+    const newBook = new Book({
+      title,
+      author,
+      description,
+      price,
+      coverImage,
+      galleryImages,
+    });
+
+    await newBook.save();
+
+    res.redirect("/books");
+
+  } catch (error) {
+    next(new HttpError(error.message, 500));
+  }
+};
+
+
+// Show Edit Book Form 
+
+const getEditBook = async (req, res, next) => {
+  try {
+    const book = await Book.findById(req.params.id);
+
+    if (!book) {
+      return next(new HttpError("Book not found", 404));
+    }
+
+    res.render("editBook", { book });
+
+  } catch (error) {
+    next(new HttpError("Invalid Book ID", 400));
+  }
+};
+
+
+// Update Book
+
+const updateBook = async (req, res, next) => {
+  try {
+    const { title, author, description, price } = req.body;
+
+    const book = await Book.findById(req.params.id);
+
+    if (!book) {
+      return next(new HttpError("Book not found", 404));
+    }
+
+    const newCoverImage = req.files?.coverImage?.[0]?.path;
+
+    if (newCoverImage) {
+      if (book.coverImage && fs.existsSync(book.coverImage)) {
+        fs.unlinkSync(book.coverImage);
+      }
+      book.coverImage = newCoverImage;
+    }
+
+    // Replace gallery images if new ones uploaded
+    const newGalleryImages =
+      req.files?.galleryImages?.map((file) => file.path);
+
+    if (newGalleryImages && newGalleryImages.length > 0) {
+
+      if (book.galleryImages?.length) {
+        book.galleryImages.forEach((file) => {
+          if (fs.existsSync(file)) {
+            fs.unlinkSync(file);
+          }
         });
-    } catch (error) {
-        next(new HttpError(error.message, 500));
+      }
+
+      book.galleryImages = newGalleryImages;
     }
+
+    book.title = title;
+    book.author = author;
+    book.description = description;
+    book.price = price;
+
+    await book.save();
+
+    res.redirect("/books");
+
+  } catch (error) {
+    next(new HttpError("Invalid Book ID", 400));
+  }
 };
 
-// GET /books/:id — get a single book by ID
-export const getBookById = async (req, res, next) => {
-    try {
-        const { id } = req.params;
 
-        if (!isValidId(id)) {
-            return next(new HttpError("Invalid book ID", 400));
-        }
+// Delete Book
 
-        const book = await Book.findById(id);
-        if (!book) {
-            return next(new HttpError("Book not found", 404));
-        }
+const deleteBook = async (req, res, next) => {
+  try {
+    const book = await Book.findById(req.params.id);
 
-        res.status(200).json({ message: "Book retrieved successfully", book });
-    } catch (error) {
-        next(new HttpError(error.message, 500));
+    if (!book) {
+      return next(new HttpError("Book not found", 404));
     }
+
+    // Delete cover image
+    if (book.coverImage && fs.existsSync(book.coverImage)) {
+      fs.unlinkSync(book.coverImage);
+    }
+
+    // Delete gallery images
+    if (book.galleryImages?.length) {
+      book.galleryImages.forEach((file) => {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file);
+        }
+      });
+    }
+
+    await book.deleteOne();
+
+    res.redirect("/books");
+
+  } catch (error) {
+    next(new HttpError("Invalid Book ID", 400));
+  }
 };
 
-// POST /books — create a new book
-export const createBook = async (req, res, next) => {
-    try {
-        const { name, author, publishDate, price } = req.body;
 
-        if (!name || !author) {
-            return next(new HttpError("Name and author are required fields", 400));
-        }
-
-        const newBook = new Book({ name, author, publishDate, price });
-        await newBook.save();
-
-        res.status(201).json({ message: "Book created successfully", book: newBook });
-    } catch (error) {
-        if (error.name === "ValidationError") {
-            return next(new HttpError(error.message, 400));
-        }
-        next(new HttpError(error.message, 500));
-    }
-};
-
-// PUT /books/:id — update a book
-export const updateBook = async (req, res, next) => {
-    try {
-        const { id } = req.params;
-
-        if (!isValidId(id)) {
-            return next(new HttpError("Invalid book ID", 400));
-        }
-
-        const { name, author, publishDate, price } = req.body;
-
-        const updatedBook = await Book.findByIdAndUpdate(
-            id,
-            { name, author, publishDate, price },
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedBook) {
-            return next(new HttpError("Book not found", 404));
-        }
-
-        res.status(200).json({ message: "Book updated successfully", book: updatedBook });
-    } catch (error) {
-        if (error.name === "ValidationError") {
-            return next(new HttpError(error.message, 400));
-        }
-        next(new HttpError(error.message, 500));
-    }
-};
-
-// DELETE /books/:id — delete a book
-export const deleteBook = async (req, res, next) => {
-    try {
-        const { id } = req.params;
-
-        if (!isValidId(id)) {
-            return next(new HttpError("Invalid book ID", 400));
-        }
-
-        const deletedBook = await Book.findByIdAndDelete(id);
-
-        if (!deletedBook) {
-            return next(new HttpError("Book not found", 404));
-        }
-
-        res.status(200).json({ message: "Book deleted successfully", book: deletedBook });
-    } catch (error) {
-        next(new HttpError(error.message, 500));
-    }
-};
-
-// GET /books/search?name=&author=&minPrice=&maxPrice= — search & filter books
-export const searchBooks = async (req, res, next) => {
-    try {
-        const { name, author, minPrice, maxPrice } = req.query;
-        const filter = {};
-
-        if (name) filter.name = { $regex: name, $options: "i" };
-        if (author) filter.author = { $regex: author, $options: "i" };
-        if (minPrice || maxPrice) {
-            filter.price = {};
-            if (minPrice) filter.price.$gte = parseFloat(minPrice);
-            if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
-        }
-
-        const books = await Book.find(filter).sort({ createdAt: -1 });
-
-        res.status(200).json({
-            message: "Search results",
-            total: books.length,
-            books,
-        });
-    } catch (error) {
-        next(new HttpError(error.message, 500));
-    }
+export default {
+  getAllBooks,
+  getAddBook,
+  addBook,       
+  getEditBook,  
+  updateBook,
+  deleteBook,
 };
