@@ -5,40 +5,37 @@ import HttpError from "../middleware/httpError.js";
 const getAllBooks = async (req, res, next) => {
   try {
     const books = await Book.find().sort({ createdAt: -1 });
-    res.render("books", { books });
+    res.status(200).json(books);
   } catch (error) {
     next(new HttpError(error.message, 500));
   }
 };
 
-// Show Add Book Form
-const getAddBook = (req, res) => {
-  res.render("addBook");
-};
-
-// Add Book (NO multer)
+// Add Book
 const addBook = async (req, res, next) => {
   try {
     const { title, author, description, price, coverImage } = req.body;
 
-    const newBook = new Book({
+    const newBook = await Book.create({
       title,
       author,
       description,
       price,
-      coverImage, // now just a string (URL or path)
+      coverImage,
     });
 
-    await newBook.save();
-    res.redirect("/books");
+    res.status(201).json({
+      message: "Book added successfully",
+      book: newBook,
+    });
 
   } catch (error) {
     next(new HttpError(error.message, 500));
   }
 };
 
-// Show Edit Book Form
-const getEditBook = async (req, res, next) => {
+// Get Single Book
+const getSingleBook = async (req, res, next) => {
   try {
     const book = await Book.findById(req.params.id);
 
@@ -46,33 +43,30 @@ const getEditBook = async (req, res, next) => {
       return next(new HttpError("Book not found", 404));
     }
 
-    res.render("editBook", { book });
+    res.status(200).json(book);
 
   } catch (error) {
     next(new HttpError("Invalid Book ID", 400));
   }
 };
 
-// Update Book (NO multer)
+// Update Book
 const updateBook = async (req, res, next) => {
   try {
-    const { title, author, description, price, coverImage } = req.body;
-
-    const book = await Book.findById(req.params.id);
+    const book = await Book.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
 
     if (!book) {
       return next(new HttpError("Book not found", 404));
     }
 
-    book.title = title;
-    book.author = author;
-    book.description = description;
-    book.price = price;
-    book.coverImage = coverImage;
-
-    await book.save();
-
-    res.redirect("/books");
+    res.status(200).json({
+      message: "Book updated successfully",
+      book,
+    });
 
   } catch (error) {
     next(new HttpError("Invalid Book ID", 400));
@@ -82,15 +76,15 @@ const updateBook = async (req, res, next) => {
 // Delete Book
 const deleteBook = async (req, res, next) => {
   try {
-    const book = await Book.findById(req.params.id);
+    const book = await Book.findByIdAndDelete(req.params.id);
 
     if (!book) {
       return next(new HttpError("Book not found", 404));
     }
 
-    await book.deleteOne();
-
-    res.redirect("/books");
+    res.status(200).json({
+      message: "Book deleted successfully",
+    });
 
   } catch (error) {
     next(new HttpError("Invalid Book ID", 400));
@@ -99,9 +93,8 @@ const deleteBook = async (req, res, next) => {
 
 export default {
   getAllBooks,
-  getAddBook,
   addBook,
-  getEditBook,
+  getSingleBook,
   updateBook,
   deleteBook,
 };

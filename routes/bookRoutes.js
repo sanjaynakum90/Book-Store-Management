@@ -5,14 +5,12 @@ const router = express.Router();
 
 router.get("/", bookController.getAllBooks);
 
-router.get("/add", bookController.getAddBook);
-
 router.post("/add", bookController.addBook);
 
-router.get("/edit/:id", bookController.getEditBook);
+router.get("/:id", bookController.getSingleBook);
 
-router.post("/edit/:id", bookController.updateBook);
+router.put("/:id", bookController.updateBook);
 
-router.post("/delete/:id", bookController.deleteBook);
+router.delete("/:id", bookController.deleteBook);
 
 export default router;
