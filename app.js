@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 
-import HttpError from "./middleware/httpError.js";
+import HttpError from "./middleware/HttpError.js";
 import bookRoutes from "./routes/bookRoutes.js";
 import connectDb from "./config/db.js";
 

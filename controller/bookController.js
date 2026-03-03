@@ -1,5 +1,5 @@
 import Book from "../model/bookModel.js";
-import HttpError from "../middleware/httpError.js";
+import HttpError from "../middleware/HttpError.js";
 
 // Get All Books
 const getAllBooks = async (req, res, next) => {
